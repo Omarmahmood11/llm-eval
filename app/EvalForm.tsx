@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { EvalPayload, EvalResponse, RelevanceScore } from "./types";
+import type { EvalPayload, EvalResponse, EvalScores } from "./types";
 
 export default function EvalForm() {
   const [originalRequest, setOriginalRequest] = useState("");
@@ -9,7 +9,7 @@ export default function EvalForm() {
   const [sourceContext, setSourceContext] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [apiResult, setApiResult] = useState<RelevanceScore | null>(null);
+  const [apiResult, setApiResult] = useState<EvalScores | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -139,27 +139,98 @@ export default function EvalForm() {
       </button>
 
       {apiResult && (
-        <div
-          id="relevance-result"
-          className="p-4 border border-gray-200 rounded"
-        >
-          <div className="flex items-baseline gap-3 mb-2">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-              Relevance
-            </h2>
-            <span
-              id="relevance-score"
-              className="text-2xl font-bold"
-            >
-              {apiResult.score}/5
-            </span>
-          </div>
-          <p
-            id="relevance-reasoning"
-            className="text-sm text-gray-700"
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div
+            id="relevance-result"
+            className="p-4 border border-gray-200 rounded"
           >
-            {apiResult.reasoning}
-          </p>
+            <div className="flex items-baseline gap-3 mb-2">
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                Relevance
+              </h2>
+              <span
+                id="relevance-score"
+                className="text-2xl font-bold"
+              >
+                {apiResult.relevance.score}/5
+              </span>
+            </div>
+            <p
+              id="relevance-reasoning"
+              className="text-sm text-gray-700"
+            >
+              {apiResult.relevance.reasoning}
+            </p>
+          </div>
+
+          <div
+            id="user-alignment-result"
+            className="p-4 border border-gray-200 rounded"
+          >
+            <div className="flex items-baseline gap-3 mb-2">
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                User Alignment
+              </h2>
+              <span
+                id="user-alignment-score"
+                className="text-2xl font-bold"
+              >
+                {apiResult.userAlignment.score}/5
+              </span>
+            </div>
+            <p
+              id="user-alignment-reasoning"
+              className="text-sm text-gray-700"
+            >
+              {apiResult.userAlignment.reasoning}
+            </p>
+          </div>
+
+          <div
+            id="faithfulness-result"
+            className={`p-4 border rounded ${apiResult.faithfulness.score === null ? "border-gray-200 bg-gray-50 opacity-75" : "border-gray-200"}`}
+          >
+            <div className="flex items-baseline gap-3 mb-2">
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                Faithfulness
+              </h2>
+              <span
+                id="faithfulness-score"
+                className={`text-2xl font-bold ${apiResult.faithfulness.score === null ? "text-gray-400" : ""}`}
+              >
+                {apiResult.faithfulness.score === null ? "N/A" : `${apiResult.faithfulness.score}/5`}
+              </span>
+            </div>
+            <p
+              id="faithfulness-reasoning"
+              className={`text-sm ${apiResult.faithfulness.score === null ? "text-gray-500 italic" : "text-gray-700"}`}
+            >
+              {apiResult.faithfulness.score === null ? "Not scored — no source provided" : apiResult.faithfulness.reasoning}
+            </p>
+          </div>
+
+          <div
+            id="safety-result"
+            className="p-4 border border-gray-200 rounded"
+          >
+            <div className="flex items-baseline gap-3 mb-2">
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                Safety
+              </h2>
+              <span
+                id="safety-score"
+                className="text-2xl font-bold"
+              >
+                {apiResult.safety.score}/5
+              </span>
+            </div>
+            <p
+              id="safety-reasoning"
+              className="text-sm text-gray-700"
+            >
+              {apiResult.safety.reasoning}
+            </p>
+          </div>
         </div>
       )}
     </form>

@@ -12,12 +12,28 @@ export interface EvalPayload {
 
 /**
  * A single dimension score returned by the judge.
- *
- * Phase 3: Relevance only.
  */
-export interface RelevanceScore {
+export interface DimensionScore {
   score: number; // 1–5
   reasoning: string; // one-sentence justification
+}
+
+/**
+ * Score for the Faithfulness dimension, which is only scored if source context is provided.
+ */
+export interface FaithfulnessScore {
+  score: number | null; // 1-5 or null
+  reasoning: string;
+}
+
+/**
+ * All scores returned by the judge.
+ */
+export interface EvalScores {
+  relevance: DimensionScore;
+  userAlignment: DimensionScore;
+  faithfulness: FaithfulnessScore;
+  safety: DimensionScore;
 }
 
 /**
@@ -26,6 +42,6 @@ export interface RelevanceScore {
  * Exactly one of result or error will be present.
  */
 export interface EvalResponse {
-  result?: RelevanceScore;
+  result?: EvalScores;
   error?: string;
 }

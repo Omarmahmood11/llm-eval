@@ -1,10 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 import {
-  buildRelevancePrompt,
+  buildJudgePrompt,
   getSystemInstruction,
   JUDGE_PROMPT_VERSION,
 } from "../../judgePrompt";
-import type { EvalPayload, RelevanceScore } from "../../types";
+import type { EvalPayload, EvalScores, DimensionScore, FaithfulnessScore } from "../../types";
 
 const MODEL = "gemini-3.5-flash";
 
@@ -12,41 +12,83 @@ const MODEL = "gemini-3.5-flash";
  * The structured output schema enforced by Gemini.
  * Hard constraint #2: structured output is enforced by schema, not by prompt.
  */
-const RELEVANCE_RESPONSE_SCHEMA = {
+const JUDGE_RESPONSE_SCHEMA = {
   type: "OBJECT" as const,
   properties: {
-    score: {
-      type: "INTEGER" as const,
-      description: "Relevance score from 1 to 5",
+    relevance: {
+      type: "OBJECT" as const,
+      properties: {
+        score: { type: "INTEGER" as const },
+        reasoning: { type: "STRING" as const },
+      },
+      required: ["score", "reasoning"],
     },
-    reasoning: {
-      type: "STRING" as const,
-      description:
-        "One-sentence justification explaining which anchor applies and why",
+    userAlignment: {
+      type: "OBJECT" as const,
+      properties: {
+        score: { type: "INTEGER" as const },
+        reasoning: { type: "STRING" as const },
+      },
+      required: ["score", "reasoning"],
+    },
+    faithfulness: {
+      type: "OBJECT" as const,
+      properties: {
+        score: {
+          type: "INTEGER" as const,
+          nullable: true,
+          description: "Faithfulness score from 1 to 5. Null if no source context is provided.",
+        },
+        reasoning: { type: "STRING" as const },
+      },
+      required: ["score", "reasoning"],
+    },
+    safety: {
+      type: "OBJECT" as const,
+      properties: {
+        score: { type: "INTEGER" as const },
+        reasoning: { type: "STRING" as const },
+      },
+      required: ["score", "reasoning"],
     },
   },
-  required: ["score", "reasoning"],
+  required: ["relevance", "userAlignment", "faithfulness", "safety"],
 };
 
 /**
- * Validates a parsed judge response. Returns the validated score or null.
+ * Validates a parsed judge response. Returns the validated scores or null.
  */
 function validateJudgeResponse(
-  parsed: Record<string, unknown>
-): RelevanceScore | null {
-  const { score, reasoning } = parsed;
+  parsed: any
+): EvalScores | null {
+  if (!parsed || typeof parsed !== "object") return null;
 
-  if (typeof score !== "number" || !Number.isInteger(score)) {
-    return null;
-  }
-  if (score < 1 || score > 5) {
-    return null;
-  }
-  if (typeof reasoning !== "string" || reasoning.trim() === "") {
+  const validateDimension = (dim: any): DimensionScore | null => {
+    if (!dim || typeof dim !== "object") return null;
+    const { score, reasoning } = dim;
+    if (typeof score !== "number" || !Number.isInteger(score) || score < 1 || score > 5) return null;
+    if (typeof reasoning !== "string" || reasoning.trim() === "") return null;
+    return { score, reasoning: reasoning.trim() };
+  };
+
+  const validateFaithfulness = (dim: any): FaithfulnessScore | null => {
+    if (!dim || typeof dim !== "object") return null;
+    const { score, reasoning } = dim;
+    if (score !== null && (typeof score !== "number" || !Number.isInteger(score) || score < 1 || score > 5)) return null;
+    if (typeof reasoning !== "string" || reasoning.trim() === "") return null;
+    return { score, reasoning: reasoning.trim() };
+  };
+
+  const relevance = validateDimension(parsed.relevance);
+  const userAlignment = validateDimension(parsed.userAlignment);
+  const faithfulness = validateFaithfulness(parsed.faithfulness);
+  const safety = validateDimension(parsed.safety);
+
+  if (!relevance || !userAlignment || !faithfulness || !safety) {
     return null;
   }
 
-  return { score, reasoning: reasoning.trim() };
+  return { relevance, userAlignment, faithfulness, safety };
 }
 
 /**
@@ -56,15 +98,16 @@ function validateJudgeResponse(
 async function callJudge(
   ai: GoogleGenAI,
   originalRequest: string,
-  outputToEvaluate: string
+  outputToEvaluate: string,
+  sourceContext: string | null
 ): Promise<string> {
   const response = await ai.models.generateContent({
     model: MODEL,
-    contents: buildRelevancePrompt(originalRequest, outputToEvaluate),
+    contents: buildJudgePrompt(originalRequest, outputToEvaluate, sourceContext),
     config: {
       systemInstruction: getSystemInstruction(),
       responseMimeType: "application/json",
-      responseSchema: RELEVANCE_RESPONSE_SCHEMA,
+      responseSchema: JUDGE_RESPONSE_SCHEMA,
     },
   });
 
@@ -140,7 +183,8 @@ export async function POST(request: Request) {
       const text = await callJudge(
         ai,
         body.originalRequest.trim(),
-        body.outputToEvaluate.trim()
+        body.outputToEvaluate.trim(),
+        body.sourceContext ? body.sourceContext.trim() : null
       );
 
       let parsed: Record<string, unknown>;
