@@ -11,11 +11,21 @@ export interface EvalPayload {
 }
 
 /**
+ * A single dimension score returned by the judge.
+ *
+ * Phase 3: Relevance only.
+ */
+export interface RelevanceScore {
+  score: number; // 1–5
+  reasoning: string; // one-sentence justification
+}
+
+/**
  * Response shape from POST /api/evaluate.
  *
  * Exactly one of result or error will be present.
  */
 export interface EvalResponse {
-  result?: string;
+  result?: RelevanceScore;
   error?: string;
 }

@@ -138,3 +138,13 @@ Whether they also go into the judge prompt is a separate open question, to be se
 Google states free tier requests may be used to improve models. The intended user pastes their company's LLM outputs. Silently sending that to a training-eligible endpoint is a real problem, not a theoretical one.
 
 A visible notice is the honest handling, and the constraint itself is worth documenting as a deployment tradeoff.
+
+## Judge model: gemini-3.5-flash
+
+`gemini-2.0-flash` was deprecated by August 2026 and returns 404. Free tier for
+3.5-flash: 15 RPM, 1,500 RPD, 1M context window, no card required. Pro models
+have moved behind billing, so Flash and Flash-Lite are the only viable free
+options.
+
+The model name is a single constant at the top of the route file, so swapping
+it is trivial. The judge is swappable; the rubric is the product.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { EvalPayload, EvalResponse } from "./types";
+import type { EvalPayload, EvalResponse, RelevanceScore } from "./types";
 
 export default function EvalForm() {
   const [originalRequest, setOriginalRequest] = useState("");
@@ -9,7 +9,7 @@ export default function EvalForm() {
   const [sourceContext, setSourceContext] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [apiResult, setApiResult] = useState<string | null>(null);
+  const [apiResult, setApiResult] = useState<RelevanceScore | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -140,11 +140,26 @@ export default function EvalForm() {
 
       {apiResult && (
         <div
-          id="api-result"
-          className="p-3 border border-green-400 bg-green-50 text-green-900 rounded text-sm"
+          id="relevance-result"
+          className="p-4 border border-gray-200 rounded"
         >
-          <p className="font-medium mb-1">Gemini response:</p>
-          <p>{apiResult}</p>
+          <div className="flex items-baseline gap-3 mb-2">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+              Relevance
+            </h2>
+            <span
+              id="relevance-score"
+              className="text-2xl font-bold"
+            >
+              {apiResult.score}/5
+            </span>
+          </div>
+          <p
+            id="relevance-reasoning"
+            className="text-sm text-gray-700"
+          >
+            {apiResult.reasoning}
+          </p>
         </div>
       )}
     </form>
