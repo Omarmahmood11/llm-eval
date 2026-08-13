@@ -9,3 +9,13 @@ export interface EvalPayload {
   outputToEvaluate: string;
   sourceContext: string | null;
 }
+
+/**
+ * Response shape from POST /api/evaluate.
+ *
+ * Exactly one of result or error will be present.
+ */
+export interface EvalResponse {
+  result?: string;
+  error?: string;
+}

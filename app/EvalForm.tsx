@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import type { EvalPayload } from "./types";
+import type { EvalPayload, EvalResponse } from "./types";
 
 export default function EvalForm() {
   const [originalRequest, setOriginalRequest] = useState("");
   const [outputToEvaluate, setOutputToEvaluate] = useState("");
   const [sourceContext, setSourceContext] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [apiResult, setApiResult] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     const validationErrors: string[] = [];
@@ -28,6 +30,7 @@ export default function EvalForm() {
 
     // Clear any previous validation errors on successful submit
     setErrors([]);
+    setApiResult(null);
 
     const payload: EvalPayload = {
       originalRequest: originalRequest.trim(),
@@ -36,6 +39,36 @@ export default function EvalForm() {
     };
 
     console.log("Eval submission payload:", payload);
+
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const body: EvalResponse = await res.json();
+      console.log("API response:", body);
+
+      if (!res.ok || body.error) {
+        setErrors([body.error ?? `Request failed with status ${res.status}`]);
+        return;
+      }
+
+      if (body.result) {
+        setApiResult(body.result);
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Unknown error occurred";
+      setErrors([
+        `Network error: could not reach the server. Details: ${message}`,
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -99,10 +132,21 @@ export default function EvalForm() {
       <button
         id="submit-eval"
         type="submit"
-        className="self-start px-6 py-2 bg-foreground text-background rounded font-medium text-sm hover:opacity-90 transition-opacity cursor-pointer"
+        disabled={isLoading}
+        className="self-start px-6 py-2 bg-foreground text-background rounded font-medium text-sm hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Submit for Evaluation
+        {isLoading ? "Evaluating…" : "Submit for Evaluation"}
       </button>
+
+      {apiResult && (
+        <div
+          id="api-result"
+          className="p-3 border border-green-400 bg-green-50 text-green-900 rounded text-sm"
+        >
+          <p className="font-medium mb-1">Gemini response:</p>
+          <p>{apiResult}</p>
+        </div>
+      )}
     </form>
   );
 }
