@@ -56,7 +56,7 @@ The Next.js app and the Python calibration harness share the rubric and the judg
 
 - Judge returns malformed output → retry once, then surface a clear error to the user
 - API key missing or invalid → explicit error message naming the cause, not a generic failure
-- Rate limit hit → tell the user what happened and that it is a free-tier limit
+- Rate limit hit → tell the user what happened and that a daily request limit was reached
 - Network failure → distinguish from an API error in the message
 
 ---

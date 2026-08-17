@@ -1,26 +1,192 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * A dark "instrument console" identity for the LLM output evaluator.
+ *
+ * The interface reads like a piece of measurement equipment: a cinematic void
+ * with atmospheric haze, corner-bracket viewfinder framing, monospace HUD
+ * microcopy, and a segmented signal meter for every score.
+ *
+ * Score colour is a SINGLE-HUE luminance ramp (--color-score-1..5): a higher
+ * score glows brighter on the same teal hue and lights more segments on the
+ * meter. Magnitude, not pass/fail, never red-bad / green-good. The warm
+ * --color-ember is reserved for interactive chrome (focus, primary action,
+ * live marks); --color-signal marks "current / active" states.
+ */
+
+@theme {
+  /* Void + panels */
+  --color-void: #0a0b0d;
+  --color-panel: #101215;
+  --color-panel-2: #14171b;
+  --color-hair: rgba(233, 235, 230, 0.1);
+  --color-hair-bright: rgba(233, 235, 230, 0.2);
+  --color-bracket: rgba(233, 235, 230, 0.32);
+
+  /* Ink on void */
+  --color-text: #e9ebe6;
+  --color-text-dim: #9ba09b;
+  --color-text-faint: #656b6a;
+
+  /* Warm interactive accent (focus, primary action, live marks) */
+  --color-ember: #ee7a3f;
+  --color-ember-bright: #f79263;
+  --color-ember-soft: rgba(238, 122, 63, 0.14);
+
+  /* "Current / active" status */
+  --color-signal: #6fe3c9;
+  --color-signal-soft: rgba(111, 227, 201, 0.12);
+
+  /* Score ramp: luminance on one teal hue, 1 (dim) to 5 (bright) */
+  --color-score-1: #55747a;
+  --color-score-2: #4f9c93;
+  --color-score-3: #4ac0af;
+  --color-score-4: #63dcc4;
+  --color-score-5: #85f2d8;
+
+  /* Status oxides: warnings / errors only, never scores */
+  --color-flag: #e2604e;
+  --color-flag-soft: rgba(226, 96, 78, 0.12);
+  --color-caution: #d9a441;
+  --color-caution-soft: rgba(217, 164, 65, 0.12);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, "SFMono-Regular", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--color-void);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  position: relative;
+  background: var(--color-void);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Atmospheric haze, fixed so it doesn't scroll with content */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      120% 90% at 15% -10%,
+      rgba(74, 192, 175, 0.12),
+      transparent 55%
+    ),
+    radial-gradient(
+      100% 80% at 100% 110%,
+      rgba(238, 122, 63, 0.09),
+      transparent 55%
+    ),
+    radial-gradient(60% 50% at 50% 40%, rgba(20, 40, 44, 0.35), transparent 70%);
+}
+
+/* Fine grain overlay for texture */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Lift real content above the atmosphere layers */
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+::selection {
+  background: var(--color-ember-soft);
+  color: var(--color-ember-bright);
+}
+
+:focus-visible {
+  outline: 1px solid var(--color-ember);
+  outline-offset: 2px;
+}
+
+/*
+ * .frame: four corner "viewfinder" brackets drawn with 8 layered gradients.
+ * --frame-len sets tick length, --frame-inset pushes ticks outward.
+ */
+.frame {
+  --frame-len: 13px;
+  --frame-w: 1px;
+  --frame-c: var(--color-bracket);
+  --frame-inset: 0px;
+  background-image: linear-gradient(var(--frame-c), var(--frame-c)),
+    linear-gradient(var(--frame-c), var(--frame-c)),
+    linear-gradient(var(--frame-c), var(--frame-c)),
+    linear-gradient(var(--frame-c), var(--frame-c)),
+    linear-gradient(var(--frame-c), var(--frame-c)),
+    linear-gradient(var(--frame-c), var(--frame-c)),
+    linear-gradient(var(--frame-c), var(--frame-c)),
+    linear-gradient(var(--frame-c), var(--frame-c));
+  background-repeat: no-repeat;
+  background-size: var(--frame-len) var(--frame-w),
+    var(--frame-w) var(--frame-len), var(--frame-len) var(--frame-w),
+    var(--frame-w) var(--frame-len), var(--frame-len) var(--frame-w),
+    var(--frame-w) var(--frame-len), var(--frame-len) var(--frame-w),
+    var(--frame-w) var(--frame-len);
+  background-position: calc(-1 * var(--frame-inset)) calc(-1 * var(--frame-inset)),
+    calc(-1 * var(--frame-inset)) calc(-1 * var(--frame-inset)),
+    calc(100% + var(--frame-inset)) calc(-1 * var(--frame-inset)),
+    calc(100% + var(--frame-inset)) calc(-1 * var(--frame-inset)),
+    calc(-1 * var(--frame-inset)) calc(100% + var(--frame-inset)),
+    calc(-1 * var(--frame-inset)) calc(100% + var(--frame-inset)),
+    calc(100% + var(--frame-inset)) calc(100% + var(--frame-inset)),
+    calc(100% + var(--frame-inset)) calc(100% + var(--frame-inset));
+}
+
+/* Colored glow that inherits the element's text colour (score numerals) */
+.num-glow {
+  text-shadow: 0 0 26px color-mix(in srgb, currentColor 55%, transparent);
+}
+
+/* Staggered entrance for panels */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
+}
+
+/* Slow pulse for live status dot */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.pulse {
+  animation: pulse 2.4s ease-in-out infinite;
 }

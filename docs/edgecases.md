@@ -47,7 +47,7 @@ The output being evaluated is untrusted text going into a judge prompt. This is 
 |---|---|
 | API key missing | Explicit error naming the cause |
 | API key invalid | Distinguished from missing |
-| Rate limit hit | Message explaining it is a free-tier limit |
+| Rate limit hit | Message explaining a daily request limit was reached |
 | Network failure | Distinguished from an API error |
 | Judge returns malformed JSON | Retry once, then surface a clear error |
 | Judge returns valid JSON with a missing dimension | Treated as a failure, not rendered as a partial result |

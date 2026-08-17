@@ -122,7 +122,7 @@ async function callJudge(
 
   const text = response.text;
   if (!text) {
-    throw new Error("Gemini returned an empty response.");
+    throw new Error("The model returned an empty response.");
   }
 
   return text;
@@ -201,7 +201,7 @@ export async function POST(request: Request) {
       try {
         parsed = JSON.parse(text);
       } catch {
-        // Malformed JSON — retry if first attempt
+        // Malformed JSON: retry if first attempt
         if (attempt < MAX_ATTEMPTS) {
           console.warn(
             `Judge returned unparseable JSON on attempt ${attempt}. Retrying.`
@@ -220,7 +220,7 @@ export async function POST(request: Request) {
 
       const validated = validateJudgeResponse(parsed);
       if (!validated) {
-        // Parsed but failed validation — retry if first attempt
+        // Parsed but failed validation: retry if first attempt
         if (attempt < MAX_ATTEMPTS) {
           console.warn(
             `Judge response failed validation on attempt ${attempt}: ${JSON.stringify(parsed)}. Retrying.`
@@ -262,7 +262,7 @@ export async function POST(request: Request) {
         return Response.json(
           {
             error:
-              "The Gemini API key is invalid or unauthorized. Check the GEMINI_API_KEY environment variable.",
+              "The model API key is invalid or unauthorized. Check the GEMINI_API_KEY environment variable.",
             errorCategory: "auth" as ErrorCategory,
           },
           { status: 401 }
@@ -278,14 +278,14 @@ export async function POST(request: Request) {
         return Response.json(
           {
             error:
-              "Gemini rate limit reached. This is a free-tier limit — wait a moment and try again.",
+              "The daily request limit has been reached. Please wait a moment and try again.",
             errorCategory: "rate_limit" as ErrorCategory,
           },
           { status: 429 }
         );
       }
 
-      // Timeout — distinguished from network errors.
+      // Timeout: distinguished from network errors.
       if (lowerMessage.includes("timeout")) {
         return Response.json(
           {
@@ -296,10 +296,10 @@ export async function POST(request: Request) {
         );
       }
 
-      // Network or unexpected error — surface distinctly from API errors.
+      // Network or unexpected error: surface distinctly from API errors.
       return Response.json(
         {
-          error: `Failed to reach the Gemini API. This may be a network issue. Details: ${message}`,
+          error: `Failed to reach the model API. This may be a network issue. Details: ${message}`,
           errorCategory: "network" as ErrorCategory,
         },
         { status: 502 }

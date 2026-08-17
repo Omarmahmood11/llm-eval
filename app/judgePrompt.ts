@@ -5,7 +5,7 @@
  * It is never inlined in the API route. Bump JUDGE_PROMPT_VERSION on every change.
  *
  * The prompt includes the full rubric sections (anchors + notes).
- * Reference examples are deliberately excluded — see decisions.md
+ * Reference examples are deliberately excluded; see decisions.md
  * "Why reference examples stay in rubric.md" for reasoning.
  */
 
