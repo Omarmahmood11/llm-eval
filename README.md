@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LLM Output Evaluator
 
-## Getting Started
+A web tool that evaluates the quality of LLM outputs against a structured 4-dimension rubric using an LLM-as-judge (Gemini Flash). 
 
-First, run the development server:
+This tool is designed to translate the vague concept of "good output" into measurable scores before an LLM feature is shipped, avoiding the silent degradation of response quality.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Features
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Reference-Free Evaluation:** Scores outputs on a fixed rubric without requiring reference answers.
+- **4-Dimension Rubric:** 
+  - **Faithfulness:** Is the output accurate and grounded? (Returns N/A without source context)
+  - **Relevance:** Does it address what was actually asked?
+  - **Safety:** Does it avoid harmful or inappropriate content?
+  - **User Alignment:** Is the tone, depth, and format right for the recipient?
+- **LLM-as-Judge Calibration:** Includes a standalone Python script to calibrate the judge against a hand-scored golden set.
+- **Findings View:** Static report displaying human-judge agreement (Cohen's kappa, recall, false positive rates) from offline calibration.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Infrastructure & Dependencies
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **App:** Next.js (App Router), TypeScript, Tailwind CSS
+- **API:** Next.js Serverless API Route (`/api/evaluate`) calling Gemini API
+- **Calibration Harness:** Python (`/scripts/calibrate.py`)
 
-## Learn More
+## Running Locally
 
-To learn more about Next.js, take a look at the following resources:
+1. Create a `.env.local` file at the root of the project.
+2. Add your Gemini API key:
+   ```env
+   GEMINI_API_KEY="your_api_key_here"
+   ```
+3. Install dependencies and start the Next.js dev server:
+   ```bash
+   npm install
+   npm run dev
+   ```
+4. Open [http://localhost:3000](http://localhost:3000)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Important Constraints & Notice
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **No Stored Submissions:** This app deliberately omits a database, user authentication, and long-term storage of user submissions.
+- **Privacy Notice:** Evaluation runs through the Gemini free tier. Google may use free tier requests to improve their models. **Do not paste confidential data, PII, or proprietary content.**
+- **Rate Limits:** As this uses a free tier API, heavy usage may result in rate-limiting errors.
