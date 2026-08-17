@@ -37,6 +37,27 @@ export interface EvalScores {
 }
 
 /**
+ * Categorises API errors so the client can show distinct UI per error type
+ * without parsing error message strings.
+ */
+export type ErrorCategory =
+  | "rate_limit"
+  | "auth"
+  | "network"
+  | "malformed_output"
+  | "server_config"
+  | "timeout"
+  | "unknown";
+
+/**
+ * Client-side error state combining the message with its category.
+ */
+export interface EvalError {
+  message: string;
+  category: ErrorCategory;
+}
+
+/**
  * Response shape from POST /api/evaluate.
  *
  * Exactly one of result or error will be present.
@@ -44,4 +65,5 @@ export interface EvalScores {
 export interface EvalResponse {
   result?: EvalScores;
   error?: string;
+  errorCategory?: ErrorCategory;
 }

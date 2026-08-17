@@ -1,36 +1,47 @@
 "use client";
 
 import { useState } from "react";
-import type { EvalPayload, EvalResponse, EvalScores } from "./types";
+import type { EvalPayload, EvalResponse, EvalScores, EvalError } from "./types";
+import ResultsDisplay from "./ResultsDisplay";
+import ErrorDisplay from "./ErrorDisplay";
+
+/** Client-side fetch timeout. Slightly longer than server-side (25s) to let server timeout fire first. */
+const CLIENT_TIMEOUT_MS = 30_000;
 
 export default function EvalForm() {
   const [originalRequest, setOriginalRequest] = useState("");
   const [outputToEvaluate, setOutputToEvaluate] = useState("");
   const [sourceContext, setSourceContext] = useState("");
-  const [errors, setErrors] = useState<string[]>([]);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [apiResult, setApiResult] = useState<EvalScores | null>(null);
+  const [apiError, setApiError] = useState<EvalError | null>(null);
+
+  function clearResults() {
+    setApiResult(null);
+    setApiError(null);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const validationErrors: string[] = [];
+    const errors: string[] = [];
 
     if (originalRequest.trim() === "") {
-      validationErrors.push("Original request is required.");
+      errors.push("Original request is required.");
     }
     if (outputToEvaluate.trim() === "") {
-      validationErrors.push("Output to evaluate is required.");
+      errors.push("Output to evaluate is required.");
     }
 
-    if (validationErrors.length > 0) {
-      setErrors(validationErrors);
+    if (errors.length > 0) {
+      setValidationErrors(errors);
       return;
     }
 
-    // Clear any previous validation errors on successful submit
-    setErrors([]);
-    setApiResult(null);
+    // Clear any previous state on new submission
+    setValidationErrors([]);
+    clearResults();
 
     const payload: EvalPayload = {
       originalRequest: originalRequest.trim(),
@@ -42,18 +53,28 @@ export default function EvalForm() {
 
     setIsLoading(true);
 
+    // Client-side timeout via AbortController
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
+
     try {
       const res = await fetch("/api/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const body: EvalResponse = await res.json();
       console.log("API response:", body);
 
       if (!res.ok || body.error) {
-        setErrors([body.error ?? `Request failed with status ${res.status}`]);
+        setApiError({
+          message: body.error ?? `Request failed with status ${res.status}`,
+          category: body.errorCategory ?? "unknown",
+        });
         return;
       }
 
@@ -61,11 +82,23 @@ export default function EvalForm() {
         setApiResult(body.result);
       }
     } catch (err: unknown) {
+      clearTimeout(timeoutId);
+
+      // Distinguish AbortError (timeout) from network failures
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setApiError({
+          message: "The request timed out after 30 seconds.",
+          category: "timeout",
+        });
+        return;
+      }
+
       const message =
         err instanceof Error ? err.message : "Unknown error occurred";
-      setErrors([
-        `Network error: could not reach the server. Details: ${message}`,
-      ]);
+      setApiError({
+        message: `Network error: could not reach the server. Details: ${message}`,
+        category: "network",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -73,14 +106,15 @@ export default function EvalForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6 w-full max-w-2xl">
-      {errors.length > 0 && (
+      {/* Validation errors (client-side, for empty fields) */}
+      {validationErrors.length > 0 && (
         <div
           id="validation-errors"
           role="alert"
           className="p-3 border border-red-400 bg-red-50 text-red-800 rounded text-sm"
         >
           <ul className="list-disc list-inside">
-            {errors.map((error) => (
+            {validationErrors.map((error) => (
               <li key={error}>{error}</li>
             ))}
           </ul>
@@ -138,101 +172,13 @@ export default function EvalForm() {
         {isLoading ? "Evaluating…" : "Submit for Evaluation"}
       </button>
 
-      {apiResult && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div
-            id="relevance-result"
-            className="p-4 border border-gray-200 rounded"
-          >
-            <div className="flex items-baseline gap-3 mb-2">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                Relevance
-              </h2>
-              <span
-                id="relevance-score"
-                className="text-2xl font-bold"
-              >
-                {apiResult.relevance.score}/5
-              </span>
-            </div>
-            <p
-              id="relevance-reasoning"
-              className="text-sm text-gray-700"
-            >
-              {apiResult.relevance.reasoning}
-            </p>
-          </div>
-
-          <div
-            id="user-alignment-result"
-            className="p-4 border border-gray-200 rounded"
-          >
-            <div className="flex items-baseline gap-3 mb-2">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                User Alignment
-              </h2>
-              <span
-                id="user-alignment-score"
-                className="text-2xl font-bold"
-              >
-                {apiResult.userAlignment.score}/5
-              </span>
-            </div>
-            <p
-              id="user-alignment-reasoning"
-              className="text-sm text-gray-700"
-            >
-              {apiResult.userAlignment.reasoning}
-            </p>
-          </div>
-
-          <div
-            id="faithfulness-result"
-            className={`p-4 border rounded ${apiResult.faithfulness.score === null ? "border-gray-200 bg-gray-50 opacity-75" : "border-gray-200"}`}
-          >
-            <div className="flex items-baseline gap-3 mb-2">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                Faithfulness
-              </h2>
-              <span
-                id="faithfulness-score"
-                className={`text-2xl font-bold ${apiResult.faithfulness.score === null ? "text-gray-400" : ""}`}
-              >
-                {apiResult.faithfulness.score === null ? "N/A" : `${apiResult.faithfulness.score}/5`}
-              </span>
-            </div>
-            <p
-              id="faithfulness-reasoning"
-              className={`text-sm ${apiResult.faithfulness.score === null ? "text-gray-500 italic" : "text-gray-700"}`}
-            >
-              {apiResult.faithfulness.score === null ? "Not scored — no source provided" : apiResult.faithfulness.reasoning}
-            </p>
-          </div>
-
-          <div
-            id="safety-result"
-            className="p-4 border border-gray-200 rounded"
-          >
-            <div className="flex items-baseline gap-3 mb-2">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                Safety
-              </h2>
-              <span
-                id="safety-score"
-                className="text-2xl font-bold"
-              >
-                {apiResult.safety.score}/5
-              </span>
-            </div>
-            <p
-              id="safety-reasoning"
-              className="text-sm text-gray-700"
-            >
-              {apiResult.safety.reasoning}
-            </p>
-          </div>
-        </div>
+      {/* API error — contextual display per error category */}
+      {apiError && (
+        <ErrorDisplay error={apiError} onRetry={clearResults} />
       )}
+
+      {/* Results — score cards with visual weight per dimension */}
+      {apiResult && <ResultsDisplay result={apiResult} />}
     </form>
   );
 }

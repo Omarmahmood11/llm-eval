@@ -4,9 +4,12 @@ import {
   getSystemInstruction,
   JUDGE_PROMPT_VERSION,
 } from "../../judgePrompt";
-import type { EvalPayload, EvalScores, DimensionScore, FaithfulnessScore } from "../../types";
+import type { EvalPayload, EvalScores, DimensionScore, FaithfulnessScore, ErrorCategory } from "../../types";
 
 const MODEL = "gemini-3.5-flash";
+
+/** Server-side timeout for judge calls. If Gemini doesn't respond in this time, we abort. */
+const JUDGE_TIMEOUT_MS = 25_000;
 
 /**
  * The structured output schema enforced by Gemini.
@@ -94,6 +97,7 @@ function validateJudgeResponse(
 /**
  * Calls Gemini with the judge prompt and structured output schema.
  * Returns the raw text response or throws on API error.
+ * Includes a server-side timeout so the request doesn't hang indefinitely.
  */
 async function callJudge(
   ai: GoogleGenAI,
@@ -101,15 +105,20 @@ async function callJudge(
   outputToEvaluate: string,
   sourceContext: string | null
 ): Promise<string> {
-  const response = await ai.models.generateContent({
-    model: MODEL,
-    contents: buildJudgePrompt(originalRequest, outputToEvaluate, sourceContext),
-    config: {
-      systemInstruction: getSystemInstruction(),
-      responseMimeType: "application/json",
-      responseSchema: JUDGE_RESPONSE_SCHEMA,
-    },
-  });
+  const response = await Promise.race([
+    ai.models.generateContent({
+      model: MODEL,
+      contents: buildJudgePrompt(originalRequest, outputToEvaluate, sourceContext),
+      config: {
+        systemInstruction: getSystemInstruction(),
+        responseMimeType: "application/json",
+        responseSchema: JUDGE_RESPONSE_SCHEMA,
+      },
+    }),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("TIMEOUT: The evaluation timed out. The judge did not respond within 25 seconds.")), JUDGE_TIMEOUT_MS)
+    ),
+  ]);
 
   const text = response.text;
   if (!text) {
@@ -135,6 +144,7 @@ export async function POST(request: Request) {
       {
         error:
           "GEMINI_API_KEY is not configured. Set it as an environment variable on the server.",
+        errorCategory: "server_config" as ErrorCategory,
       },
       { status: 500 }
     );
@@ -202,6 +212,7 @@ export async function POST(request: Request) {
           {
             error:
               "The judge returned malformed output after two attempts. This is unexpected with schema enforcement.",
+            errorCategory: "malformed_output" as ErrorCategory,
           },
           { status: 502 }
         );
@@ -220,6 +231,7 @@ export async function POST(request: Request) {
           {
             error:
               "The judge returned malformed output after two attempts. This is unexpected with schema enforcement.",
+            errorCategory: "malformed_output" as ErrorCategory,
           },
           { status: 502 }
         );
@@ -251,6 +263,7 @@ export async function POST(request: Request) {
           {
             error:
               "The Gemini API key is invalid or unauthorized. Check the GEMINI_API_KEY environment variable.",
+            errorCategory: "auth" as ErrorCategory,
           },
           { status: 401 }
         );
@@ -266,8 +279,20 @@ export async function POST(request: Request) {
           {
             error:
               "Gemini rate limit reached. This is a free-tier limit — wait a moment and try again.",
+            errorCategory: "rate_limit" as ErrorCategory,
           },
           { status: 429 }
+        );
+      }
+
+      // Timeout — distinguished from network errors.
+      if (lowerMessage.includes("timeout")) {
+        return Response.json(
+          {
+            error: "The evaluation timed out. The judge did not respond in time.",
+            errorCategory: "timeout" as ErrorCategory,
+          },
+          { status: 504 }
         );
       }
 
@@ -275,6 +300,7 @@ export async function POST(request: Request) {
       return Response.json(
         {
           error: `Failed to reach the Gemini API. This may be a network issue. Details: ${message}`,
+          errorCategory: "network" as ErrorCategory,
         },
         { status: 502 }
       );
@@ -286,6 +312,7 @@ export async function POST(request: Request) {
     {
       error:
         "The judge returned malformed output after two attempts. This is unexpected with schema enforcement.",
+      errorCategory: "malformed_output" as ErrorCategory,
     },
     { status: 502 }
   );
