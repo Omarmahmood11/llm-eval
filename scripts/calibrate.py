@@ -19,7 +19,8 @@ from datetime import datetime, timezone
 
 # Configuration
 GOLDEN_SET_PATH = "docs/goldenSet.json"
-RESULTS_PATH = "docs/calibrationResults.json"
+RESULTS_PATH_TEMPLATE = "docs/calibrationResults_v{version}.json"
+RESULTS_PATH_LATEST = "docs/calibrationResults.json"
 CHECKPOINT_PATH = "scripts/.calibration_checkpoint.json"
 PROMPT_TS_PATH = "app/judgePrompt.ts"
 MODEL = "gemini-3.5-flash"
@@ -29,11 +30,11 @@ MODEL = "gemini-3.5-flash"
 # system instruction alone), so 15 RPM at ~3-4k tokens per call risks
 # hitting the TPM wall. A 7-second fixed delay is more reliable than
 # retrying into the same limit.
-DELAY_BETWEEN_REQUESTS = 7.0
+DELAY_BETWEEN_REQUESTS = 15.0
 
 # Retries on transient errors (429, 503, etc.)
-MAX_RETRIES = 3
-RETRY_BASE_WAIT = 30.0  # seconds; generous because the limit is TPM
+MAX_RETRIES = 5
+RETRY_BASE_WAIT = 60.0  # seconds; generous because the limit is TPM
 
 
 def extract_prompt_info():
@@ -158,6 +159,7 @@ def call_judge(api_key, system_instruction, prompt_text):
         except urllib.error.HTTPError as e:
             err_body = e.read().decode("utf-8")
             print(f"  HTTP {e.code} on attempt {attempt + 1}/{MAX_RETRIES}")
+            print(f"  Error body: {err_body}")
 
             if e.code == 429 or e.code >= 500:
                 # Parse the suggested retry delay if the API provides one
@@ -460,7 +462,12 @@ def main():
         "disagreements": disagreements,
     }
 
-    with open(RESULTS_PATH, "w") as f:
+    versioned_path = RESULTS_PATH_TEMPLATE.format(version=prompt_version)
+    with open(versioned_path, "w") as f:
+        json.dump(final_output, f, indent=2)
+
+    # Also overwrite the latest results file (used by the findings page)
+    with open(RESULTS_PATH_LATEST, "w") as f:
         json.dump(final_output, f, indent=2)
 
     # Clean up checkpoint after successful full run
@@ -516,7 +523,8 @@ def main():
     else:
         print("\nNo disagreements — perfect agreement across all dimensions.")
 
-    print(f"\nResults saved to {RESULTS_PATH}")
+    print(f"\nResults saved to {versioned_path}")
+    print(f"Latest results also at {RESULTS_PATH_LATEST}")
 
 
 if __name__ == "__main__":
